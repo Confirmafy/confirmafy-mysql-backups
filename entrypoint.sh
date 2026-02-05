@@ -5,8 +5,8 @@
 # -o pipefail: pipeline fails if any command in it fails
 set -euo pipefail
 
-# Backup filename includes date and hour (UTC) for hourly cron runs
-BACKUP_TIMESTAMP=$(date -u +%Y-%m-%d-%H)
+# Backup filename includes date, hour and minute (UTC) for cron runs
+BACKUP_TIMESTAMP=$(date -u +%Y-%m-%d-%H-%M)
 BACKUP_FILENAME="backup-${BACKUP_TIMESTAMP}.stream"
 
 # shellcheck disable=SC2086
@@ -31,4 +31,4 @@ EOF
 rclone sync backup remote:"$R2_BUCKET"/"$R2_PATH"
 
 # Remove backups on the remote that are older than 7 days
-rclone delete remote:"$R2_BUCKET"/"$R2_PATH" --min-age 5m
+rclone delete remote:"$R2_BUCKET"/"$R2_PATH" --min-age 3m
