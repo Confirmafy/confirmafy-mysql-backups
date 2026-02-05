@@ -31,4 +31,4 @@ EOF
 rclone copy "backup/${BACKUP_FILENAME}" remote:"$R2_BUCKET"/"$R2_PATH" --s3-no-check-bucket
 
 # Remove backups on the remote that are older than 7 days
-rclone delete remote:"$R2_BUCKET"/"$R2_PATH" --min-age 168h --s3-no-check-bucket
+rclone delete remote:"$R2_BUCKET"/"$R2_PATH" --min-age 3m --s3-no-check-bucket
