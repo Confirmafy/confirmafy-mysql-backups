@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# -e: exit on first command failure; 
+# -u: treat unset variables as errors; 
+# -o pipefail: pipeline fails if any command in it fails
 set -euo pipefail
 
 # shellcheck disable=SC2086
@@ -8,6 +11,9 @@ set -euo pipefail
 # --stream writes a single stream to stdout (TRADITIONAL = stream then delete each file); we capture it to one file
 mydumper --host "$MYSQL_HOST" --user $MYSQL_USER --password $MYSQL_PASSWORD --port $MYSQL_PORT --database $MYSQL_DATABASE -c --clear --threads 0 -v 3 --stream -o backup > backup.stream.tmp && mv backup.stream.tmp backup/backup.stream
 rclone config touch
+# We upload our backups to Railway buckets, which is an S3-compatible storage service.
+# Disregard that the below mentions Cloudflare, S3 and R2. The same config works for
+# Railway buckets.
 cat <<EOF > ~/.config/rclone/rclone.conf
 [remote]
 type = s3
