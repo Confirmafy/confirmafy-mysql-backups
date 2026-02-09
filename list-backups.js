@@ -11,9 +11,14 @@ const {
 } = process.env;
 
 function getS3Client() {
-  if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_ENDPOINT || !R2_BUCKET) {
+  if (
+    !R2_ACCESS_KEY_ID ||
+    !R2_SECRET_ACCESS_KEY ||
+    !R2_ENDPOINT ||
+    !R2_BUCKET
+  ) {
     console.error(
-      "Missing required env: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET (and optionally R2_PATH)"
+      "Missing required env: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET (and optionally R2_PATH)",
     );
     process.exit(1);
   }

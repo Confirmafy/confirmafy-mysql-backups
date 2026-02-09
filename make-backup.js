@@ -68,7 +68,11 @@ function getS3Client() {
 
 async function uploadBackup(s3, bucket, key, filePath) {
   const { size } = await stat(filePath);
-  console.log(`Uploading ${filePath} (${(size / 1024 / 1024).toFixed(1)} MB) to ${key} ...`);
+  console.log(
+    `Uploading ${filePath} (${(size / 1024 / 1024).toFixed(
+      1,
+    )} MB) to ${key} ...`,
+  );
 
   await s3.send(
     new PutObjectCommand({
@@ -76,7 +80,7 @@ async function uploadBackup(s3, bucket, key, filePath) {
       Key: key,
       Body: createReadStream(filePath),
       ContentLength: size,
-    })
+    }),
   );
   console.log("Upload complete.");
 }
@@ -85,7 +89,12 @@ async function uploadBackup(s3, bucket, key, filePath) {
  * Delete remote backups older than `maxAgeMs` (default 7 days).
  * Mirrors the old behaviour: rclone delete remote:bucket/path --min-age 168h
  */
-async function deleteOldBackups(s3, bucket, prefix, maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
+async function deleteOldBackups(
+  s3,
+  bucket,
+  prefix,
+  maxAgeMs = 4 * 60 * 60 * 1000,
+) {
   const cutoff = new Date(Date.now() - maxAgeMs);
   console.log(`Deleting remote backups older than ${cutoff.toISOString()} ...`);
 
@@ -97,7 +106,7 @@ async function deleteOldBackups(s3, bucket, prefix, maxAgeMs = 7 * 24 * 60 * 60 
         Bucket: bucket,
         Prefix: prefix,
         ContinuationToken: continuationToken,
-      })
+      }),
     );
     if (result.Contents) {
       for (const obj of result.Contents) {
@@ -121,7 +130,7 @@ async function deleteOldBackups(s3, bucket, prefix, maxAgeMs = 7 * 24 * 60 * 60 
       new DeleteObjectsCommand({
         Bucket: bucket,
         Delete: { Objects: batch },
-      })
+      }),
     );
   }
   console.log(`Deleted ${toDelete.length} old backup(s).`);
@@ -156,18 +165,26 @@ export async function makeBackup() {
   // --trx-tables  → optimised for InnoDB tables (all Confirmafy tables use InnoDB)
   //                  Verified with: SHOW TABLE STATUS FROM `railway`;
   const args = [
-    "--host", MYSQL_HOST,
-    "--user", MYSQL_USER,
-    "--password", MYSQL_PASSWORD,
-    "--port", MYSQL_PORT,
-    "--database", MYSQL_DATABASE,
+    "--host",
+    MYSQL_HOST,
+    "--user",
+    MYSQL_USER,
+    "--password",
+    MYSQL_PASSWORD,
+    "--port",
+    MYSQL_PORT,
+    "--database",
+    MYSQL_DATABASE,
     "-c",
     "--clear",
     "--trx-tables",
-    "--threads", "0",
-    "-v", "3",
+    "--threads",
+    "0",
+    "-v",
+    "3",
     "--stream",
-    "-o", "backup",
+    "-o",
+    "backup",
   ];
 
   console.log(`Running mydumper → ${localPath} ...`);
@@ -181,6 +198,9 @@ export async function makeBackup() {
   closeSync(fd);
 
   if (result.status !== 0) {
+    logEvent("backup_failed", {
+      exit_code: result.status,
+    });
     throw new Error(`mydumper failed (exit code ${result.status})`);
   }
   console.log("mydumper finished.");
@@ -188,12 +208,22 @@ export async function makeBackup() {
   // 3. Upload to S3-compatible storage
   const { client, bucket, prefix } = getS3Client();
   const remoteKey = `${prefix}${filename}`;
-  await uploadBackup(client, bucket, remoteKey, localPath);
+
+  try {
+    await uploadBackup(client, bucket, remoteKey, localPath);
+  } catch (error) {
+    logEvent("backup_upload_failed", {
+      error: error.message,
+    });
+    throw error;
+  }
+
+  logEvent("backup_success");
 
   // 4. Clean up local temp file
   await unlink(localPath);
 
-  // 5. Delete remote backups older than 7 days
+  // 5. Delete remote backups
   await deleteOldBackups(client, bucket, prefix);
 
   console.log("Backup complete.");

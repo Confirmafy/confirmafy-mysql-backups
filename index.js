@@ -1,5 +1,8 @@
 import cron from "node-cron";
 import { makeBackup } from "./make-backup.js";
+import { register } from "./instrumentation.js";
+
+register();
 
 // Run a backup immediately on startup, then every hour
 async function runBackup() {
