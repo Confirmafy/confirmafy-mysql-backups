@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
-import { createWriteStream } from "fs";
-import { pipeline } from "stream/promises";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
-import inquirer from "inquirer";
+import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 const {
   R2_ACCESS_KEY_ID,
@@ -64,57 +61,24 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function downloadBackup(s3, bucket, key, outputPath) {
-  const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const response = await s3.send(cmd);
-  if (!response.Body) throw new Error("Empty response body");
-  await pipeline(response.Body, createWriteStream(outputPath));
-}
-
 async function main() {
   const { client, bucket, prefix } = getS3Client();
 
   console.log("Fetching backup list...\n");
   const backups = await listBackups(client, bucket, prefix);
+
   if (backups.length === 0) {
     console.log("No backups found.");
     return;
   }
 
-  const choices = backups.map((obj, i) => {
+  console.log(`Found ${backups.length} backup(s):\n`);
+  for (const obj of backups) {
     const name = obj.Key.replace(prefix, "");
     const date = obj.LastModified ? obj.LastModified.toISOString() : "—";
     const size = formatSize(obj.Size);
-    return {
-      name: `${name}  (${date} · ${size})`,
-      value: obj.Key,
-      short: name,
-    };
-  });
-
-  const { selectedKey } = await inquirer.prompt([
-    {
-      type: "select",
-      name: "selectedKey",
-      message: "Choose a backup to download",
-      pageSize: 15,
-      choices,
-    },
-  ]);
-
-  const filename = selectedKey.replace(prefix, "").replace(/\/$/, "") || "backup.stream";
-  const { outputPath } = await inquirer.prompt([
-    {
-      type: "input",
-      name: "outputPath",
-      message: "Save to path:",
-      default: filename,
-    },
-  ]);
-
-  console.log(`Downloading ${selectedKey} to ${outputPath}...`);
-  await downloadBackup(client, bucket, selectedKey, outputPath);
-  console.log("Done.");
+    console.log(`  ${name}  (${date} · ${size})`);
+  }
 }
 
 main().catch((err) => {
