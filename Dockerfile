@@ -1,13 +1,18 @@
 # syntax=docker/dockerfile:1
 
-FROM rclone/rclone:1.72.0 as rclone
-
 FROM mydumper/mydumper:v0.21.2-2
 
-COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
+# Install Node.js 22.x (LTS) — the mydumper image is AlmaLinux 9 (RHEL-based)
+RUN dnf module enable -y nodejs:22 \
+    && dnf install -y nodejs npm \
+    && dnf clean all
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY index.js ./
 
 ENV MYSQL_HOST=""
 ENV MYSQL_USER=""
@@ -20,4 +25,4 @@ ENV R2_ENDPOINT=""
 ENV R2_BUCKET=""
 ENV R2_PATH="mysql-backup"
 
-CMD ["/entrypoint.sh"]
+CMD ["node", "index.js"]
