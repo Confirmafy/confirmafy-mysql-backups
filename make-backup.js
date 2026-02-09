@@ -190,9 +190,3 @@ export async function makeBackup() {
 
   console.log("Backup complete.");
 }
-
-// Allow running directly: node make-backup.js
-makeBackup().catch((err) => {
-  console.error("Backup failed:", err);
-  process.exit(1);
-});

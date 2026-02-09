@@ -1,3 +1,8 @@
 import { makeBackup } from "./make-backup.js";
 
-await makeBackup();
+try {
+    await makeBackup();
+} catch (error) {
+    console.error("Backup failed:", error);
+    process.exit(1);
+}
