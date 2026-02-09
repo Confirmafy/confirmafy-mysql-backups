@@ -12,8 +12,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY index.js ./
+COPY index.js make-backup.js restore-backup.js list-backups.js ./
 
+# This is just informational. These are the variables that index.js requires.
 ENV MYSQL_HOST=""
 ENV MYSQL_USER=""
 ENV MYSQL_PASSWORD=""
