@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readdirSync, statSync } from "fs";
+import { readdirSync, statSync, openSync, closeSync } from "fs";
 import { spawnSync } from "child_process";
 import { resolve } from "path";
 import inquirer from "inquirer";
@@ -14,10 +14,6 @@ function parseConnectionUrl(url) {
     password: decodeURIComponent(parsed.password),
     database: parsed.pathname.replace(/^\//, ""),
   };
-}
-
-function shellEscape(str) {
-  return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
 function findBackups(dir) {
@@ -99,46 +95,29 @@ async function main() {
     process.exit(0);
   }
 
-  // Build the inner shell command with proper escaping
-  const innerCmd = [
-    "myloader",
-    "--host", shellEscape(host),
-    "--port", shellEscape(port),
-    "--user", shellEscape(user),
-    "--password", shellEscape(password),
-    "--database", shellEscape(database),
+  // Call myloader directly — mydumper is available in the container image
+  const backupPath = resolve(backupDir, selectedBackup);
+  const myloaderArgs = [
+    "--host", host,
+    "--port", port,
+    "--user", user,
+    "--password", password,
+    "--database", database,
     "--drop-table",
     "--drop-database",
     "--stream",
-    "--verbose 3",
-    "--protocol tcp",
-    `< ${shellEscape("/dump/" + selectedBackup)}`,
-  ].join(" ");
-
-  // Docker arguments breakdown:
-  //   run              — create and start a new container
-  //   --rm             — automatically remove the container when it exits
-  //   -v <dir>:/dump   — bind-mount the local backup directory into /dump
-  //                      inside the container so myloader can read the
-  //                      .stream file directly from the container filesystem
-  //   mydumper/...     — the official mydumper image which ships myloader
-  //   sh -c <cmd>      — run the myloader command through a shell so that
-  //                      the input redirect (< /dump/file.stream) is handled
-  //                      inside the container rather than on the host
-  const dockerArgs = [
-    "run",
-    "--rm",
-    "-v",
-    `${backupDir}:/dump`,
-    "mydumper/mydumper:latest",
-    "sh",
-    "-c",
-    innerCmd,
+    "--verbose", "3",
+    "--protocol", "tcp",
   ];
 
   console.log(`\nRunning restore...\n`);
 
-  const result = spawnSync("docker", dockerArgs, { stdio: "inherit" });
+  // Feed the .stream file into myloader's stdin
+  const fd = openSync(backupPath, "r");
+  const result = spawnSync("myloader", myloaderArgs, {
+    stdio: [fd, "inherit", "inherit"],
+  });
+  closeSync(fd);
 
   if (result.status === 0) {
     console.log("\nRestore completed successfully.");
