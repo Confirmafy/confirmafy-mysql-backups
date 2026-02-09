@@ -2,10 +2,17 @@ import { logs } from "@opentelemetry/api-logs";
 
 const logger = logs.getLogger("confirmafy-server", "1.0.0");
 
-export const BACKUP_RESULT_EVENTS = {
-  BACKUP_FAILED: "confirmafy_mysql_backups.backup_failed",
-  BACKUP_UPLOAD_FAILED: "confirmafy_mysql_backups.backup_upload_failed",
-  BACKUP_SUCCESS: "confirmafy_mysql_backups.backup_success",
+export const BACKUP_RESULT_EVENT = {
+  EVENT_NAME: "confirmafy_mysql_backups.backup_result",
+  ATTRIBUTES: {
+    ERROR_CODE: "error_code",
+    RESULT: "result",
+    RESULT_VALUES: {
+      BACKUP_FAILED: "backup_failed",
+      BACKUP_UPLOAD_FAILED: "backup_upload_failed",
+      BACKUP_SUCCESS: "backup_success",
+    }
+  }
 }
 
 export function logEvent(

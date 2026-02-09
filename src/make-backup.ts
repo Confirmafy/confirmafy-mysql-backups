@@ -8,7 +8,7 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import type { ObjectIdentifier } from "@aws-sdk/client-s3";
-import { BACKUP_RESULT_EVENTS, logEvent } from "./otel.js";
+import { BACKUP_RESULT_EVENT, logEvent } from "./otel.js";
 
 const {
   MYSQL_HOST,
@@ -211,8 +211,9 @@ export async function makeBackup(): Promise<void> {
   closeSync(fd);
 
   if (result.status !== 0) {
-    logEvent(BACKUP_RESULT_EVENTS.BACKUP_FAILED, {
-      exit_code: result.status,
+    logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]: BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_FAILED,
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.ERROR_CODE]: result.status,
     });
     throw new Error(`mydumper failed (exit code ${result.status})`);
   }
@@ -225,13 +226,15 @@ export async function makeBackup(): Promise<void> {
   try {
     await uploadBackup(client, bucket, remoteKey, localPath);
   } catch (error) {
-    logEvent(BACKUP_RESULT_EVENTS.BACKUP_UPLOAD_FAILED, {
-      error: error instanceof Error ? error.message : String(error),
+    logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]: BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_UPLOAD_FAILED,
     });
     throw error;
   }
 
-  logEvent(BACKUP_RESULT_EVENTS.BACKUP_SUCCESS);
+  logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
+    [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]: BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_SUCCESS,
+  });
 
   // 4. Clean up local temp file
   await unlink(localPath);
