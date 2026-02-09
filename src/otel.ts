@@ -1,3 +1,4 @@
+import { AttributeValue } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
 
 const logger = logs.getLogger("confirmafy-server", "1.0.0");
@@ -16,18 +17,18 @@ export const BACKUP_RESULT_EVENT = {
 }
 
 export function logEvent(
-  eventName: string,
-  eventData: Record<string, unknown> = {},
-): void {
+  name: string,
+  eventData?: { [key: string]: AttributeValue },
+) {
   try {
     logger.emit({
       attributes: {
-        event_name: eventName,
-        event_data: JSON.stringify(eventData),
+        event_name: name,
+        event_data: eventData,
       },
-      eventName: eventName,
-    });
+      eventName: name, // This seems to be unsupported by Axiom. I don't see it in the data.
+    })
   } catch (error) {
-    console.error("Error emitting opentelemetry log", error);
+    console.error("Error emitting opentelemetry log", error)
   }
 }
