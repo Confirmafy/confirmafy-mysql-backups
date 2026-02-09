@@ -212,8 +212,9 @@ export async function makeBackup(): Promise<void> {
 
   if (result.status !== 0) {
     logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
-      [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]: BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_FAILED,
-      [BACKUP_RESULT_EVENT.ATTRIBUTES.ERROR_CODE]: result.status,
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]:
+        BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_FAILED,
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.ERROR_CODE]: result.status ?? -1,
     });
     throw new Error(`mydumper failed (exit code ${result.status})`);
   }
