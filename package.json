@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.985.0",
-    "inquirer": "^13.2.2"
+    "inquirer": "^13.2.2",
+    "node-cron": "^4.2.1"
   }
 }

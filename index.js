@@ -1,8 +1,20 @@
+import cron from "node-cron";
 import { makeBackup } from "./make-backup.js";
 
-try {
+// Run a backup immediately on startup, then every hour
+async function runBackup() {
+  try {
     await makeBackup();
-} catch (error) {
+  } catch (error) {
     console.error("Backup failed:", error);
-    process.exit(1);
+  }
 }
+
+console.log("Running initial backup...");
+await runBackup();
+
+console.log("Scheduling backups to run every hour.");
+cron.schedule("0 * * * *", () => {
+  console.log(`\n[${new Date().toISOString()}] Starting scheduled backup...`);
+  runBackup();
+});
