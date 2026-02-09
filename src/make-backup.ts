@@ -8,7 +8,7 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import type { ObjectIdentifier } from "@aws-sdk/client-s3";
-import { logEvent } from "./otel.js";
+import { BACKUP_RESULT_EVENTS, logEvent } from "./otel.js";
 
 const {
   MYSQL_HOST,
@@ -211,7 +211,7 @@ export async function makeBackup(): Promise<void> {
   closeSync(fd);
 
   if (result.status !== 0) {
-    logEvent("backup_failed", {
+    logEvent(BACKUP_RESULT_EVENTS.BACKUP_FAILED, {
       exit_code: result.status,
     });
     throw new Error(`mydumper failed (exit code ${result.status})`);
@@ -225,13 +225,13 @@ export async function makeBackup(): Promise<void> {
   try {
     await uploadBackup(client, bucket, remoteKey, localPath);
   } catch (error) {
-    logEvent("backup_upload_failed", {
+    logEvent(BACKUP_RESULT_EVENTS.BACKUP_UPLOAD_FAILED, {
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
 
-  logEvent("backup_success");
+  logEvent(BACKUP_RESULT_EVENTS.BACKUP_SUCCESS);
 
   // 4. Clean up local temp file
   await unlink(localPath);
