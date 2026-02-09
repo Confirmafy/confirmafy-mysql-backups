@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
-import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  type _Object,
+} from "@aws-sdk/client-s3";
 
 const {
   R2_ACCESS_KEY_ID,
@@ -10,7 +14,13 @@ const {
   R2_PATH = "mysql-backup",
 } = process.env;
 
-function getS3Client() {
+interface S3Config {
+  client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
+function getS3Client(): S3Config {
   if (
     !R2_ACCESS_KEY_ID ||
     !R2_SECRET_ACCESS_KEY ||
@@ -22,7 +32,7 @@ function getS3Client() {
     );
     process.exit(1);
   }
-  const prefix = R2_PATH.endsWith("/") ? R2_PATH : `${R2_PATH}/`;
+  const prefix = R2_PATH!.endsWith("/") ? R2_PATH! : `${R2_PATH}/`;
   return {
     client: new S3Client({
       region: "auto",
@@ -38,9 +48,13 @@ function getS3Client() {
   };
 }
 
-async function listBackups(s3, bucket, prefix) {
-  const keys = [];
-  let continuationToken;
+async function listBackups(
+  s3: S3Client,
+  bucket: string,
+  prefix: string,
+): Promise<_Object[]> {
+  const keys: _Object[] = [];
+  let continuationToken: string | undefined;
   do {
     const cmd = new ListObjectsV2Command({
       Bucket: bucket,
@@ -56,17 +70,20 @@ async function listBackups(s3, bucket, prefix) {
     continuationToken = result.NextContinuationToken;
   } while (continuationToken);
 
-  return keys.sort((a, b) => (b.LastModified || 0) - (a.LastModified || 0));
+  return keys.sort(
+    (a, b) =>
+      (b.LastModified?.getTime() ?? 0) - (a.LastModified?.getTime() ?? 0),
+  );
 }
 
-function formatSize(bytes) {
+function formatSize(bytes: number | undefined): string {
   if (bytes == null) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function main() {
+async function main(): Promise<void> {
   const { client, bucket, prefix } = getS3Client();
 
   console.log("Fetching backup list...\n");
@@ -79,14 +96,14 @@ async function main() {
 
   console.log(`Found ${backups.length} backup(s):\n`);
   for (const obj of backups) {
-    const name = obj.Key.replace(prefix, "");
+    const name = obj.Key!.replace(prefix, "");
     const date = obj.LastModified ? obj.LastModified.toISOString() : "—";
     const size = formatSize(obj.Size);
     console.log(`  ${name}  (${date} · ${size})`);
   }
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

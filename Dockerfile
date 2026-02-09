@@ -9,10 +9,9 @@ RUN dnf module enable -y nodejs:22 \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-COPY index.js make-backup.js restore-backup.js list-backups.js ./
+COPY package.json package-lock.json tsconfig.json ./
+COPY src/ src/
+RUN npm ci && npm run build && npm prune --omit=dev
 
 # This is just informational. These are the variables that index.js requires.
 ENV MYSQL_HOST=""
@@ -26,4 +25,4 @@ ENV R2_ENDPOINT=""
 ENV R2_BUCKET=""
 ENV R2_PATH="mysql-backup"
 
-CMD ["node", "index.js"]
+CMD ["node", "dist/index.js"]

@@ -10,14 +10,13 @@ import {
 } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
-export function register() {
+export function register(): void {
   const resource = defaultResource().merge(
     resourceFromAttributes({
       [ATTR_SERVICE_NAME]: "confirmafy-mysql-backups",
     }),
   );
 
-  // Set up LoggerProvider. We use this to log events.
   const loggerProvider = new LoggerProvider({
     resource: resource,
     processors: [
@@ -33,6 +32,5 @@ export function register() {
     ],
   });
 
-  // Set the LoggerProvider as global
   logs.setGlobalLoggerProvider(loggerProvider);
 }

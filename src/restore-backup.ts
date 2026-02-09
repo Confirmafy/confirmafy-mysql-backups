@@ -4,7 +4,13 @@ import { createWriteStream, openSync, closeSync } from "fs";
 import { unlink } from "fs/promises";
 import { pipeline } from "stream/promises";
 import { spawnSync } from "child_process";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  GetObjectCommand,
+  type _Object,
+} from "@aws-sdk/client-s3";
+import type { Readable } from "stream";
 import inquirer from "inquirer";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +29,15 @@ const {
 // Connection URL parsing
 // ---------------------------------------------------------------------------
 
-function parseConnectionUrl(url) {
+interface ConnectionInfo {
+  host: string;
+  port: string;
+  user: string;
+  password: string;
+  database: string;
+}
+
+function parseConnectionUrl(url: string): ConnectionInfo {
   const parsed = new URL(url);
   return {
     host: parsed.hostname,
@@ -38,14 +52,25 @@ function parseConnectionUrl(url) {
 // S3 helpers
 // ---------------------------------------------------------------------------
 
-function getS3Client() {
-  if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_ENDPOINT || !R2_BUCKET) {
+interface S3Config {
+  client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
+function getS3Client(): S3Config {
+  if (
+    !R2_ACCESS_KEY_ID ||
+    !R2_SECRET_ACCESS_KEY ||
+    !R2_ENDPOINT ||
+    !R2_BUCKET
+  ) {
     console.error(
-      "Missing required env: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET"
+      "Missing required env: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET",
     );
     process.exit(1);
   }
-  const prefix = R2_PATH.endsWith("/") ? R2_PATH : `${R2_PATH}/`;
+  const prefix = R2_PATH!.endsWith("/") ? R2_PATH! : `${R2_PATH}/`;
   return {
     client: new S3Client({
       region: "auto",
@@ -61,9 +86,13 @@ function getS3Client() {
   };
 }
 
-async function listBackups(s3, bucket, prefix) {
-  const keys = [];
-  let continuationToken;
+async function listBackups(
+  s3: S3Client,
+  bucket: string,
+  prefix: string,
+): Promise<_Object[]> {
+  const keys: _Object[] = [];
+  let continuationToken: string | undefined;
   do {
     const cmd = new ListObjectsV2Command({
       Bucket: bucket,
@@ -79,21 +108,29 @@ async function listBackups(s3, bucket, prefix) {
     continuationToken = result.NextContinuationToken;
   } while (continuationToken);
 
-  return keys.sort((a, b) => (b.LastModified || 0) - (a.LastModified || 0));
+  return keys.sort(
+    (a, b) =>
+      (b.LastModified?.getTime() ?? 0) - (a.LastModified?.getTime() ?? 0),
+  );
 }
 
-async function downloadBackup(s3, bucket, key, outputPath) {
+async function downloadBackup(
+  s3: S3Client,
+  bucket: string,
+  key: string,
+  outputPath: string,
+): Promise<void> {
   const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
   const response = await s3.send(cmd);
   if (!response.Body) throw new Error("Empty response body");
-  await pipeline(response.Body, createWriteStream(outputPath));
+  await pipeline(response.Body as Readable, createWriteStream(outputPath));
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatSize(bytes) {
+function formatSize(bytes: number | undefined): string {
   if (bytes == null) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -104,21 +141,23 @@ function formatSize(bytes) {
 // Main
 // ---------------------------------------------------------------------------
 
-async function main() {
+async function main(): Promise<void> {
   // 1. Get the MySQL connection URL
   let connectionUrl = process.argv[2];
   if (!connectionUrl) {
-    const { url } = await inquirer.prompt([
+    const { url } = await inquirer.prompt<{ url: string }>([
       {
         type: "input",
         name: "url",
-        message: "Enter MySQL connection URL (mysql://user:pass@host:port/database):",
+        message:
+          "Enter MySQL connection URL (mysql://user:pass@host:port/database):",
       },
     ]);
     connectionUrl = url;
   }
 
-  const { host, port, user, password, database } = parseConnectionUrl(connectionUrl);
+  const { host, port, user, password, database } =
+    parseConnectionUrl(connectionUrl);
   console.log(`\nTarget: ${user}@${host}:${port}/${database}\n`);
 
   // 2. List available backups from S3
@@ -133,17 +172,17 @@ async function main() {
   }
 
   const choices = backups.map((obj) => {
-    const name = obj.Key.replace(prefix, "");
+    const name = obj.Key!.replace(prefix, "");
     const date = obj.LastModified ? obj.LastModified.toISOString() : "—";
     const size = formatSize(obj.Size);
     return {
       name: `${name}  (${date} · ${size})`,
-      value: obj.Key,
+      value: obj.Key!,
       short: name,
     };
   });
 
-  const { selectedKey } = await inquirer.prompt([
+  const { selectedKey } = await inquirer.prompt<{ selectedKey: string }>([
     {
       type: "select",
       name: "selectedKey",
@@ -155,7 +194,7 @@ async function main() {
 
   // 3. Confirm — this is destructive
   const backupName = selectedKey.replace(prefix, "");
-  const { confirmed } = await inquirer.prompt([
+  const { confirmed } = await inquirer.prompt<{ confirmed: boolean }>([
     {
       type: "confirm",
       name: "confirmed",
@@ -177,16 +216,23 @@ async function main() {
 
   // 5. Run myloader with the downloaded backup piped into stdin
   const myloaderArgs = [
-    "--host", host,
-    "--port", port,
-    "--user", user,
-    "--password", password,
-    "--database", database,
+    "--host",
+    host,
+    "--port",
+    port,
+    "--user",
+    user,
+    "--password",
+    password,
+    "--database",
+    database,
     "--drop-table",
     "--drop-database",
     "--stream",
-    "--verbose", "3",
-    "--protocol", "tcp",
+    "--verbose",
+    "3",
+    "--protocol",
+    "tcp",
   ];
 
   console.log("Running myloader restore...\n");
@@ -208,7 +254,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

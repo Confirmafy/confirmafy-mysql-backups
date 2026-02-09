@@ -5,7 +5,7 @@ import { register } from "./instrumentation.js";
 register();
 
 // Run a backup immediately on startup, then every hour
-async function runBackup() {
+async function runBackup(): Promise<void> {
   try {
     await makeBackup();
   } catch (error) {

@@ -7,6 +7,8 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
+import type { ObjectIdentifier } from "@aws-sdk/client-s3";
+import { logEvent } from "./otel.js";
 
 const {
   MYSQL_HOST,
@@ -25,8 +27,8 @@ const {
 // Validation
 // ---------------------------------------------------------------------------
 
-function validateEnv() {
-  const required = {
+function validateEnv(): void {
+  const required: Record<string, string | undefined> = {
     MYSQL_HOST,
     MYSQL_USER,
     MYSQL_PASSWORD,
@@ -49,29 +51,38 @@ function validateEnv() {
 // S3 helpers
 // ---------------------------------------------------------------------------
 
-function getS3Client() {
-  const prefix = R2_PATH.endsWith("/") ? R2_PATH : `${R2_PATH}/`;
+interface S3Config {
+  client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
+function getS3Client(): S3Config {
+  const prefix = R2_PATH!.endsWith("/") ? R2_PATH! : `${R2_PATH}/`;
   return {
     client: new S3Client({
       region: "auto",
       endpoint: R2_ENDPOINT,
       credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID,
-        secretAccessKey: R2_SECRET_ACCESS_KEY,
+        accessKeyId: R2_ACCESS_KEY_ID!,
+        secretAccessKey: R2_SECRET_ACCESS_KEY!,
       },
       forcePathStyle: true,
     }),
-    bucket: R2_BUCKET,
+    bucket: R2_BUCKET!,
     prefix,
   };
 }
 
-async function uploadBackup(s3, bucket, key, filePath) {
+async function uploadBackup(
+  s3: S3Client,
+  bucket: string,
+  key: string,
+  filePath: string,
+): Promise<void> {
   const { size } = await stat(filePath);
   console.log(
-    `Uploading ${filePath} (${(size / 1024 / 1024).toFixed(
-      1,
-    )} MB) to ${key} ...`,
+    `Uploading ${filePath} (${(size / 1024 / 1024).toFixed(1)} MB) to ${key} ...`,
   );
 
   await s3.send(
@@ -86,20 +97,22 @@ async function uploadBackup(s3, bucket, key, filePath) {
 }
 
 /**
- * Delete remote backups older than `maxAgeMs` (default 7 days).
+ * Delete remote backups older than `maxAgeMs` (default 4 hours).
  * Mirrors the old behaviour: rclone delete remote:bucket/path --min-age 168h
  */
 async function deleteOldBackups(
-  s3,
-  bucket,
-  prefix,
-  maxAgeMs = 4 * 60 * 60 * 1000,
-) {
+  s3: S3Client,
+  bucket: string,
+  prefix: string,
+  maxAgeMs: number = 4 * 60 * 60 * 1000,
+): Promise<void> {
   const cutoff = new Date(Date.now() - maxAgeMs);
-  console.log(`Deleting remote backups older than ${cutoff.toISOString()} ...`);
+  console.log(
+    `Deleting remote backups older than ${cutoff.toISOString()} ...`,
+  );
 
-  const toDelete = [];
-  let continuationToken;
+  const toDelete: ObjectIdentifier[] = [];
+  let continuationToken: string | undefined;
   do {
     const result = await s3.send(
       new ListObjectsV2Command({
@@ -110,7 +123,7 @@ async function deleteOldBackups(
     );
     if (result.Contents) {
       for (const obj of result.Contents) {
-        if (obj.LastModified && obj.LastModified < cutoff) {
+        if (obj.Key && obj.LastModified && obj.LastModified < cutoff) {
           toDelete.push({ Key: obj.Key });
         }
       }
@@ -140,7 +153,7 @@ async function deleteOldBackups(
 // Main
 // ---------------------------------------------------------------------------
 
-export async function makeBackup() {
+export async function makeBackup(): Promise<void> {
   validateEnv();
 
   // 1. Generate timestamped filename (UTC)
@@ -166,15 +179,15 @@ export async function makeBackup() {
   //                  Verified with: SHOW TABLE STATUS FROM `railway`;
   const args = [
     "--host",
-    MYSQL_HOST,
+    MYSQL_HOST!,
     "--user",
-    MYSQL_USER,
+    MYSQL_USER!,
     "--password",
-    MYSQL_PASSWORD,
+    MYSQL_PASSWORD!,
     "--port",
     MYSQL_PORT,
     "--database",
-    MYSQL_DATABASE,
+    MYSQL_DATABASE!,
     "-c",
     "--clear",
     "--trx-tables",
@@ -213,7 +226,7 @@ export async function makeBackup() {
     await uploadBackup(client, bucket, remoteKey, localPath);
   } catch (error) {
     logEvent("backup_upload_failed", {
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
