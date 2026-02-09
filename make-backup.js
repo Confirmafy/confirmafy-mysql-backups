@@ -1,6 +1,6 @@
-import { createReadStream } from "fs";
+import { createReadStream, openSync, closeSync } from "fs";
 import { stat, unlink } from "fs/promises";
-import { execFileSync } from "child_process";
+import { spawnSync } from "child_process";
 import {
   S3Client,
   PutObjectCommand,
@@ -146,14 +146,15 @@ export async function makeBackup() {
   const filename = `backup-${ts}.stream`;
   const localPath = `/tmp/${filename}`;
 
-  // 2. Run mydumper and write the .stream file
-  // 
-  // --threads 0 means "use the number of CPU cores"
-  // -v 3 means "verbose level 3" - includes info logs
-  // --stream writes a single stream to stdout (TRADITIONAL = stream then delete each file); we capture it to one file
-  // --trx-tables is to optimize the dumps. We can use this flag because all of Confirmafy's MySQL tables are using the InnoDB engine.
-  // To verify that I ran the following in the Confirmafy database: SHOW TABLE STATUS FROM `railway`;
-  const { writeFileSync } = await import("fs");
+  // 2. Run mydumper and stream output directly to file
+  //
+  // --threads 0   → use the number of CPU cores
+  // -v 3          → verbose level 3 (info logs)
+  // --stream      → writes a single stream to stdout; we redirect it straight to a file
+  // -c            → compress output
+  // --clear       → clear the output directory before dumping
+  // --trx-tables  → optimised for InnoDB tables (all Confirmafy tables use InnoDB)
+  //                  Verified with: SHOW TABLE STATUS FROM `railway`;
   const args = [
     "--host", MYSQL_HOST,
     "--user", MYSQL_USER,
@@ -170,11 +171,18 @@ export async function makeBackup() {
   ];
 
   console.log(`Running mydumper → ${localPath} ...`);
-  const stdout = execFileSync("mydumper", args, {
-    stdio: ["ignore", "pipe", "inherit"],
-    maxBuffer: 500 * 1024 * 1024, // 500 MB
+
+  // Stream stdout directly to a file instead of buffering in memory,
+  // so backups of any size work without hitting Node.js buffer limits.
+  const fd = openSync(localPath, "w");
+  const result = spawnSync("mydumper", args, {
+    stdio: ["ignore", fd, "inherit"],
   });
-  writeFileSync(localPath, stdout);
+  closeSync(fd);
+
+  if (result.status !== 0) {
+    throw new Error(`mydumper failed (exit code ${result.status})`);
+  }
   console.log("mydumper finished.");
 
   // 3. Upload to S3-compatible storage
