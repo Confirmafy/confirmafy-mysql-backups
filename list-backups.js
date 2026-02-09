@@ -94,7 +94,7 @@ async function main() {
 
   const { selectedKey } = await inquirer.prompt([
     {
-      type: "list",
+      type: "select",
       name: "selectedKey",
       message: "Choose a backup to download",
       pageSize: 15,

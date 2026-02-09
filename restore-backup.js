@@ -76,7 +76,7 @@ async function main() {
 
   const { selectedBackup } = await inquirer.prompt([
     {
-      type: "list",
+      type: "select",
       name: "selectedBackup",
       message: "Choose a backup to restore:",
       pageSize: 15,

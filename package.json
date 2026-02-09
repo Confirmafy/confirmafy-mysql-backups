@@ -5,9 +5,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "list-backups": "node list-backups.js",
+    "restore-backup": "node restore-backup.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.985.0"
+    "@aws-sdk/client-s3": "^3.985.0",
+    "inquirer": "^13.2.2"
   }
 }
