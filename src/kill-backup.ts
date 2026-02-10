@@ -17,8 +17,14 @@ if (pids.length === 0) {
 
 console.log("Found mydumper PID(s):", pids.join(", "));
 
-for (const pid of pids) {
-  spawnSync("kill", ["-TERM", pid], { stdio: "inherit" });
+for (const pidStr of pids) {
+  const pid = parseInt(pidStr, 10);
+  if (Number.isNaN(pid)) continue;
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch (err) {
+    console.error(`Failed to send SIGTERM to ${pid}:`, err);
+  }
 }
 
 console.log("Sent SIGTERM. The backup job should stop shortly.");
