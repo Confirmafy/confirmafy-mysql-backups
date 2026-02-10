@@ -3,9 +3,9 @@
 FROM mydumper/mydumper:v0.21.2-2
 
 # Install Node.js 22.x (LTS) and procps-ng (pgrep, pkill) — AlmaLinux 9 (RHEL-based)
-# Also install screen so we can run the restore jobs in the background when needed.
+# Also install tmux so we can run restore jobs in the background and detach/reattach.
 RUN dnf module enable -y nodejs:22 \
-    && dnf install -y nodejs npm procps-ng screen \
+    && dnf install -y nodejs npm procps-ng tmux \
     && dnf clean all
 
 WORKDIR /app
