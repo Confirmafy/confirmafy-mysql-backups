@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "list-backups": "node dist/list-backups.js",
     "restore-backup": "node dist/restore-backup.js",
-    "kill-mydumper": "node dist/kill-mydumper.js",
+    "kill-backup": "node dist/kill-backup.js",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "typecheck": "tsc --noEmit"

@@ -72,5 +72,5 @@ If a backup job execution is causing problems, do this to kill it:
 ```bash
 railway ssh
 
-npm run kill-mydumper
+npm run kill-backup
 ```
