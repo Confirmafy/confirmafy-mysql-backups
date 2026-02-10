@@ -170,7 +170,7 @@ export async function makeBackup(): Promise<void> {
 
   // 2. Run mydumper and stream output directly to file
   //
-  // --threads 0   → use the number of CPU cores
+  // --threads 6   → use 6 threads
   // -v 3          → verbose level 3 (info logs)
   // --stream      → writes a single stream to stdout; we redirect it straight to a file
   // -c            → compress output
@@ -192,7 +192,7 @@ export async function makeBackup(): Promise<void> {
     "--clear",
     "--trx-tables",
     "--threads",
-    "0",
+    "6",
     "-v",
     "3",
     "--stream",

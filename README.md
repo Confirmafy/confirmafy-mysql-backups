@@ -65,6 +65,16 @@ npm run restore-backup
 
 5. Once the restore is complete, you can now go and point Confirmafy Web Service to it.
 
+## Create ad-hoc backup
+
+This is for creating backups whenever you want. Just run the below.
+
+```bash
+railway ssh
+
+npm run adhoc-backup
+```
+
 ## How do I kill a backup job?
 
 If a backup job execution is causing problems, do this to kill it:
