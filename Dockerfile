@@ -2,9 +2,10 @@
 
 FROM mydumper/mydumper:v0.21.2-2
 
-# Install Node.js 22.x (LTS) — the mydumper image is AlmaLinux 9 (RHEL-based)
+# Install Node.js 22.x (LTS) and procps-ng (pgrep, pkill) — AlmaLinux 9 (RHEL-based)
+# Also install screen so we can run the restore jobs in the background when needed.
 RUN dnf module enable -y nodejs:22 \
-    && dnf install -y nodejs npm \
+    && dnf install -y nodejs npm procps-ng screen \
     && dnf clean all
 
 WORKDIR /app
