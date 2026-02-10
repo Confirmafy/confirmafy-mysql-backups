@@ -10,6 +10,7 @@ The container also has node scripts for viewing backups and restoring from a bac
 
 - 6 threads backup + Upload = 6 minutes 48 seconds
 - 6 threads backup + Upload using Confirmafy production DB = 16 minutes 13 seconds
+- Restore from 2.3 GB backup and default settings on DB = 17 minutes
 
 ## How do I ssh into the container doing the backups?
 
