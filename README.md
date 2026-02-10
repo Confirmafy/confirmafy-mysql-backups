@@ -70,7 +70,16 @@ npm run restore-backup
 If a backup job execution is causing problems, do this to kill it:
 
 ```bash
+# IMPORTANT: read comments below for information about how killing works.
+
 railway ssh
 
+# What this does is it sends a SIGTERM signal to all the active mydumper processes.
+# mydumper is designed to initiate a graceful shutdown when it receives that signal.
+# In my testing, a graceful shutdown can take ~5 minutes. It depends on what mydumper is doing
+# when it receives the signal.
+# IF YOU RUN THIS A SECOND TIME then the mydumper processes will be killed instantly and ungracefully.
+# So you have that option, but it's unclear what its consequences are for the database. It maybe be left
+# with some dead resources to cleanup.
 npm run kill-backup
 ```
