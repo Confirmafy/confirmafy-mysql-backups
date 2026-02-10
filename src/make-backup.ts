@@ -97,14 +97,14 @@ async function uploadBackup(
 }
 
 /**
- * Delete remote backups older than `maxAgeMs` (default 4 hours).
+ * Delete remote backups older than `maxAgeMs` (default 4 days).
  * Mirrors the old behaviour: rclone delete remote:bucket/path --min-age 168h
  */
 async function deleteOldBackups(
   s3: S3Client,
   bucket: string,
   prefix: string,
-  maxAgeMs: number = 4 * 60 * 60 * 1000,
+  maxAgeMs: number = 4 * 24 * 60 * 60 * 1000,
 ): Promise<void> {
   const cutoff = new Date(Date.now() - maxAgeMs);
   console.log(

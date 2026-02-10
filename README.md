@@ -6,10 +6,15 @@ The backup job runs with node-cron. See `index.js` for the entry point.
 
 The container also has node scripts for viewing backups and restoring from a backup.
 
+## Benchmarks
+
+- 6 threads backup + Upload = 6 minutes 48 seconds
+- 6 threads backup + Upload using Confirmafy production DB = 16 minutes 13 seconds
+
 ## How do I ssh into the container doing the backups?
 
 ```bash
-# Run this and follow prompts to link to the service in Railway that is linked to this repository.
+# Run this and follow prompts to link to the service in Railway that deployed this repository.
 railway link
 
 # Run this and you are in.
