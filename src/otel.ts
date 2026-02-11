@@ -3,6 +3,14 @@ import { logs } from "@opentelemetry/api-logs";
 
 const logger = logs.getLogger("confirmafy-server", "1.0.0");
 
+/**
+ * IMPORTANT!
+ * 
+ * There are monitors configured on the error codes below. If you modify them, make sure to update the monitors accordingly.
+ * 
+ * https://app.axiom.co/confirmafy-czcl/monitors
+ */
+
 export const BACKUP_RESULT_EVENT = {
   EVENT_NAME: "confirmafy_mysql_backups.backup_result",
   ATTRIBUTES: {
