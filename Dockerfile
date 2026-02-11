@@ -14,16 +14,25 @@ COPY package.json package-lock.json tsconfig.json ./
 COPY src/ src/
 RUN npm ci && npm run build && npm prune --omit=dev
 
-# This is just informational. These are the variables that index.js requires.
+# These are for the database that we take backups of.
 ENV MYSQL_HOST=""
 ENV MYSQL_USER=""
 ENV MYSQL_PASSWORD=""
 ENV MYSQL_PORT="3306"
 ENV MYSQL_DATABASE=""
+
+# These are for the S3-compatible storage that we upload backups to.
 ENV R2_ACCESS_KEY_ID=""
 ENV R2_SECRET_ACCESS_KEY=""
 ENV R2_ENDPOINT=""
 ENV R2_BUCKET=""
 ENV R2_PATH="mysql-backup"
+
+# These are for the database that we regularly restore to in order to test that restores are working.
+ENV MYSQL_TO_RESTORE_HOST=""
+ENV MYSQL_TO_RESTORE_USER=""
+ENV MYSQL_TO_RESTORE_PASSWORD=""
+ENV MYSQL_TO_RESTORE_PORT="3306"
+ENV MYSQL_TO_RESTORE_DATABASE=""
 
 CMD ["node", "dist/index.js"]

@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "adhoc-backup": "node dist/adhoc-backup.js",
+    "adhoc-test-restore": "node dist/adhoc-test-restore.js",
     "list-backups": "node dist/list-backups.js",
     "restore-backup": "node dist/restore-backup.js",
     "kill-backup": "node dist/kill-backup.js",

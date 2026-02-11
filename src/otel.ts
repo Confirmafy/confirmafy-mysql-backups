@@ -16,6 +16,21 @@ export const BACKUP_RESULT_EVENT = {
   }
 }
 
+export const TEST_RESTORE_RESULT_EVENT = {
+  EVENT_NAME: "confirmafy_mysql_backups.test_restore_result",
+  ATTRIBUTES: {
+    ERROR_CODE: "error_code",
+    RESULT: "result",
+    RESULT_VALUES: {
+      TEST_RESTORE_SUCCESS: "test_restore_success",
+      TEST_RESTORE_FAILED: "test_restore_failed",
+      TEST_RESTORE_NO_BACKUPS: "test_restore_no_backups",
+      TEST_RESTORE_DOWNLOAD_FAILED: "test_restore_download_failed",
+      TEST_RESTORE_ABORTED_SAME_AS_BACKUP: "test_restore_aborted_same_as_backup",
+    }
+  }
+}
+
 export function logEvent(
   name: string,
   eventData?: { [key: string]: AttributeValue },
