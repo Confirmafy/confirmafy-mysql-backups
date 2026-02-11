@@ -12,8 +12,8 @@ async function runBackup(): Promise<void> {
   }
 }
 
-console.log("Scheduling backups to run daily at 10:00 AM Toronto time.");
-cron.schedule("0 10 * * *", () => {
+console.log("Scheduling backups to run daily at 12:00 PM (noon) Toronto time.");
+cron.schedule("0 12 * * *", () => {
   console.log(`\n[${new Date().toISOString()}] Starting scheduled backup...`);
   runBackup();
 }, {
