@@ -29,7 +29,7 @@ ENV R2_BUCKET=""
 ENV R2_PATH="mysql-backup"
 
 # These are for the database that we regularly restore to in order to test that restores are working.
-ENV MYSQL_TO_RESTORE_HOST=""
+# Note that the hostname is hardcoded. It's too dangerous to trust an env variable.
 ENV MYSQL_TO_RESTORE_USER=""
 ENV MYSQL_TO_RESTORE_PASSWORD=""
 ENV MYSQL_TO_RESTORE_PORT="3306"

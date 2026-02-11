@@ -11,14 +11,13 @@ import {
 import type { Readable } from "stream";
 import { TEST_RESTORE_RESULT_EVENT, logEvent } from "./otel.js";
 
-// Since this script is very dangerous, you must add the host that restores will be run on to this allowlist.
-const ALLOWED_RESTORE_HOSTS = ["mysql-fu1u.railway.internal"];
+// Restores always go to this host. Myloader is called with this value.
+const RESTORE_TARGET_HOST = "mysql-fu1u.railway.internal";
 
 const {
   MYSQL_HOST,
   MYSQL_PORT = "3306",
   MYSQL_DATABASE,
-  MYSQL_TO_RESTORE_HOST,
   MYSQL_TO_RESTORE_USER,
   MYSQL_TO_RESTORE_PASSWORD,
   MYSQL_TO_RESTORE_PORT = "3306",
@@ -36,7 +35,6 @@ const {
 
 function validateEnv(): void {
   const required: Record<string, string | undefined> = {
-    MYSQL_TO_RESTORE_HOST,
     MYSQL_TO_RESTORE_USER,
     MYSQL_TO_RESTORE_PASSWORD,
     MYSQL_TO_RESTORE_DATABASE,
@@ -66,7 +64,7 @@ function isRestoreTargetDifferentFromBackup(): boolean {
   const backupPort = (MYSQL_PORT ?? "3306").trim();
   const backupDb = MYSQL_DATABASE.trim().toLowerCase();
   
-  const restoreHost = MYSQL_TO_RESTORE_HOST!.trim().toLowerCase();
+  const restoreHost = RESTORE_TARGET_HOST.trim().toLowerCase();
   const restorePort = (MYSQL_TO_RESTORE_PORT ?? "3306").trim();
   const restoreDb = MYSQL_TO_RESTORE_DATABASE!.trim().toLowerCase();
 
@@ -75,31 +73,12 @@ function isRestoreTargetDifferentFromBackup(): boolean {
     console.error("*** [test-restore] CRITICAL: Restore target is the same as the backup (production) database. ***");
     console.error("*** Refusing to run restore to prevent overwriting production. ***");
     console.error(`*** Backup source: ${MYSQL_HOST}:${backupPort}/${MYSQL_DATABASE} ***`);
-    console.error(`*** Restore target: ${MYSQL_TO_RESTORE_HOST}:${restorePort}/${MYSQL_TO_RESTORE_DATABASE} ***`);
+    console.error(`*** Restore target: ${RESTORE_TARGET_HOST}:${restorePort}/${MYSQL_TO_RESTORE_DATABASE} ***`);
     console.error("*** Fix MYSQL_TO_RESTORE_* env vars to point to a different database. ***");
     console.error("");
     return false;
   }
   return true;
-}
-
-/**
- * Returns true if the restore target host is in the allowlist.
- * If not, logs a serious warning and returns false so the restore is skipped.
- */
-function isRestoreHostAllowed(): boolean {
-  const allowed = ALLOWED_RESTORE_HOSTS.map((h) => h.trim().toLowerCase());
-  const restoreHost = MYSQL_TO_RESTORE_HOST!.trim().toLowerCase();
-  if (allowed.includes(restoreHost)) {
-    return true;
-  }
-  console.error("");
-  console.error("*** [test-restore] CRITICAL: Restore target host is not in the allowlist. ***");
-  console.error("*** Refusing to run restore to prevent overwriting an unapproved database. ***");
-  console.error(`*** Restore target host: ${MYSQL_TO_RESTORE_HOST} ***`);
-  console.error(`*** Allowed hosts: ${allowed.join(", ")} ***`);
-  console.error("");
-  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,14 +165,6 @@ export async function runTestRestore(): Promise<void> {
     return;
   }
 
-  if (!isRestoreHostAllowed()) {
-    logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
-      [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
-        TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_ABORTED_HOST_NOT_ALLOWED,
-    });
-    return;
-  }
-
   const { client, bucket, prefix } = getS3Client();
 
   console.log("[test-restore] Fetching backup list from S3...");
@@ -229,7 +200,7 @@ export async function runTestRestore(): Promise<void> {
   try {
     const myloaderArgs = [
       "--host",
-      MYSQL_TO_RESTORE_HOST!,
+      RESTORE_TARGET_HOST,
       "--port",
       MYSQL_TO_RESTORE_PORT,
       "--user",
