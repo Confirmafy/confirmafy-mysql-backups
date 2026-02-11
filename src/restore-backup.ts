@@ -233,6 +233,8 @@ async function main(): Promise<void> {
     "3",
     "--protocol",
     "tcp",
+    "--threads",
+    "0", // use all CPU cores
   ];
 
   console.log("Running myloader restore...\n");

@@ -216,6 +216,8 @@ export async function runTestRestore(): Promise<void> {
       "3",
       "--protocol",
       "tcp",
+      "--threads",
+      "0", // use all CPU cores
     ];
 
     console.log("[test-restore] Running myloader restore...");
