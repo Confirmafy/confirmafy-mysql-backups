@@ -10,7 +10,7 @@ The container also has node scripts for viewing backups and restoring from a bac
 
 - 6 threads backup + Upload = 6 minutes 48 seconds
 - 6 threads backup + Upload using Confirmafy production DB = 16 minutes 13 seconds
-- Restore from 2.3 GB backup and default settings on DB = 17 minutes
+- Restore from 2.3 GB backup and default settings on DB + all threads = 6 minutes 20 seconds
 
 ## How do I ssh into the container doing the backups?
 
@@ -98,4 +98,23 @@ railway ssh
 # So you have that option, but it's unclear what its consequences are for the database. It maybe be left
 # with some dead resources to cleanup.
 npm run kill-backup
+```
+
+## What is the test restore functionality?
+
+To make sure restoring from a backup works, we run a daily restore job using the latest backup file in the bucket.
+
+The hostname of the database we restore to is hardcoded in test-restore.ts
+
+It's hardcoded because it would be too dangerous to have that controlled via an env variable. We want to be 100% sure we don't overwrite the production database.
+
+If you want to run a test restore manually, run this command:
+
+```bash
+railway ssh
+
+# Start a tmux session so your restore doesn't die halfway through because of your SSH session getting disconnected.
+tmux
+
+npm run adhoc-test-restore
 ```

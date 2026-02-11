@@ -23,8 +23,8 @@ async function runTestRestoreJob(): Promise<void> {
 
 const cronOptions = { timezone: "America/Toronto" };
 
-console.log("Scheduling backups to run daily at 09:00 AM Toronto time.");
-cron.schedule("0 9 * * *", () => {
+console.log("Scheduling backups to run daily at 09:00 AM and 03:00 PM Toronto time.");
+cron.schedule("0 9,15 * * *", () => {
   console.log(`\n[${new Date().toISOString()}] Starting scheduled backup...`);
   runBackup();
 }, cronOptions);
