@@ -21,12 +21,18 @@ ENV MYSQL_PASSWORD=""
 ENV MYSQL_PORT="3306"
 ENV MYSQL_DATABASE=""
 
-# These are for the S3-compatible storage that we upload backups to.
+# These are for the Railway bucket that we upload backups to.
 ENV R2_ACCESS_KEY_ID=""
 ENV R2_SECRET_ACCESS_KEY=""
 ENV R2_ENDPOINT=""
 ENV R2_BUCKET=""
 ENV R2_PATH="mysql-backup"
+
+# These are for the S3 bucket we also upload backups to for redundancy.
+ENV AWS_ACCESS_KEY_ID=""
+ENV AWS_S3_BUCKET=""
+ENV AWS_S3_REGION=""
+ENV AWS_SECRET_ACCESS_KEY=""
 
 # These are for the database that we regularly restore to in order to test that restores are working.
 # Note that the hostname is hardcoded. It's too dangerous to trust an env variable.

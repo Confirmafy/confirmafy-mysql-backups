@@ -19,6 +19,7 @@ export const BACKUP_RESULT_EVENT = {
     RESULT_VALUES: {
       BACKUP_FAILED: "backup_failed",
       BACKUP_UPLOAD_FAILED: "backup_upload_failed",
+      BACKUP_AWS_UPLOAD_FAILED: "backup_aws_upload_failed",
       BACKUP_SUCCESS: "backup_success",
     }
   }

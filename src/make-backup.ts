@@ -21,6 +21,10 @@ const {
   R2_ENDPOINT,
   R2_BUCKET,
   R2_PATH = "mysql-backup",
+  AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY,
+  AWS_S3_BUCKET,
+  AWS_S3_REGION,
 } = process.env;
 
 // ---------------------------------------------------------------------------
@@ -37,6 +41,10 @@ function validateEnv(): void {
     R2_SECRET_ACCESS_KEY,
     R2_ENDPOINT,
     R2_BUCKET,
+    AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY,
+    AWS_S3_BUCKET,
+    AWS_S3_REGION,
   };
   const missing = Object.entries(required)
     .filter(([, v]) => !v)
@@ -57,7 +65,7 @@ interface S3Config {
   prefix: string;
 }
 
-function getS3Client(): S3Config {
+function getRailwayBucketS3Client(): S3Config {
   const prefix = R2_PATH!.endsWith("/") ? R2_PATH! : `${R2_PATH}/`;
   return {
     client: new S3Client({
@@ -70,6 +78,24 @@ function getS3Client(): S3Config {
       forcePathStyle: true,
     }),
     bucket: R2_BUCKET!,
+    prefix,
+  };
+}
+
+/**
+ * Returns AWS S3 config for backup upload. Requires AWS_* env vars (validated at startup).
+ */
+function getAWSS3Client(): S3Config {
+  const prefix = R2_PATH!.endsWith("/") ? R2_PATH! : `${R2_PATH}/`;
+  return {
+    client: new S3Client({
+      region: AWS_S3_REGION!,
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID!,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY!,
+      },
+    }),
+    bucket: AWS_S3_BUCKET!,
     prefix,
   };
 }
@@ -221,7 +247,7 @@ export async function makeBackup(): Promise<void> {
   console.log("mydumper finished.");
 
   // 3. Upload to S3-compatible storage
-  const { client, bucket, prefix } = getS3Client();
+  const { client, bucket, prefix } = getRailwayBucketS3Client();
   const remoteKey = `${prefix}${filename}`;
 
   try {
@@ -229,6 +255,20 @@ export async function makeBackup(): Promise<void> {
   } catch (error) {
     logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
       [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]: BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_UPLOAD_FAILED,
+    });
+    throw error;
+  }
+
+  // 3b. Upload to AWS S3
+  const awsConfig = getAWSS3Client();
+  try {
+    console.log("Uploading to AWS S3...");
+    await uploadBackup(awsConfig.client, awsConfig.bucket, remoteKey, localPath);
+    console.log("AWS S3 upload complete.");
+  } catch (error) {
+    logEvent(BACKUP_RESULT_EVENT.EVENT_NAME, {
+      [BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT]:
+        BACKUP_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.BACKUP_AWS_UPLOAD_FAILED,
     });
     throw error;
   }
