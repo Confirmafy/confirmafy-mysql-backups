@@ -10,6 +10,8 @@ import {
 } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
+let loggerProvider: LoggerProvider | undefined;
+
 export function register(): void {
   const resource = defaultResource().merge(
     resourceFromAttributes({
@@ -17,7 +19,7 @@ export function register(): void {
     }),
   );
 
-  const loggerProvider = new LoggerProvider({
+  loggerProvider = new LoggerProvider({
     resource: resource,
     processors: [
       new BatchLogRecordProcessor(
@@ -33,4 +35,18 @@ export function register(): void {
   });
 
   logs.setGlobalLoggerProvider(loggerProvider);
+}
+
+/**
+ * Flush and shutdown the logger provider so pending log events are sent before the process exits.
+ * Call this in adhoc scripts before exiting.
+ */
+export async function flushAndShutdown(): Promise<void> {
+  if (!loggerProvider) return;
+  try {
+    await loggerProvider.forceFlush();
+    await loggerProvider.shutdown();
+  } catch (error) {
+    console.error("Error flushing OpenTelemetry logs:", error);
+  }
 }

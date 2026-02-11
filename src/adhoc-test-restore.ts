@@ -1,5 +1,5 @@
 import { runTestRestore } from "./test-restore.js";
-import { register } from "./instrumentation.js";
+import { register, flushAndShutdown } from "./instrumentation.js";
 
 /**
  * Run the test restore manually from the command line.
@@ -8,8 +8,16 @@ import { register } from "./instrumentation.js";
 
 register();
 
-console.log("Running adhoc test restore...");
-await runTestRestore().catch((error) => {
-  console.error("Test restore failed:", error);
-  process.exit(1);
-});
+async function main(): Promise<void> {
+  console.log("Running adhoc test restore...");
+  try {
+    await runTestRestore();
+  } catch (error) {
+    console.error("Test restore failed:", error);
+    process.exitCode = 1;
+  } finally {
+    await flushAndShutdown();
+  }
+}
+
+await main();
