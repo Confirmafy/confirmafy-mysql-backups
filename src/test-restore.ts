@@ -11,6 +11,9 @@ import {
 import type { Readable } from "stream";
 import { TEST_RESTORE_RESULT_EVENT, logEvent } from "./otel.js";
 
+// Since this script is very dangerous, you must add the host that restores will be run on to this allowlist.
+const ALLOWED_RESTORE_HOSTS = ["mysql-fu1u.railway.internal"];
+
 const {
   MYSQL_HOST,
   MYSQL_PORT = "3306",
@@ -78,6 +81,25 @@ function isRestoreTargetDifferentFromBackup(): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Returns true if the restore target host is in the allowlist.
+ * If not, logs a serious warning and returns false so the restore is skipped.
+ */
+function isRestoreHostAllowed(): boolean {
+  const allowed = ALLOWED_RESTORE_HOSTS.map((h) => h.trim().toLowerCase());
+  const restoreHost = MYSQL_TO_RESTORE_HOST!.trim().toLowerCase();
+  if (allowed.includes(restoreHost)) {
+    return true;
+  }
+  console.error("");
+  console.error("*** [test-restore] CRITICAL: Restore target host is not in the allowlist. ***");
+  console.error("*** Refusing to run restore to prevent overwriting an unapproved database. ***");
+  console.error(`*** Restore target host: ${MYSQL_TO_RESTORE_HOST} ***`);
+  console.error(`*** Allowed hosts: ${allowed.join(", ")} ***`);
+  console.error("");
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +182,14 @@ export async function runTestRestore(): Promise<void> {
     logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
       [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
         TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_ABORTED_SAME_AS_BACKUP,
+    });
+    return;
+  }
+
+  if (!isRestoreHostAllowed()) {
+    logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
+      [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
+        TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_ABORTED_HOST_NOT_ALLOWED,
     });
     return;
   }

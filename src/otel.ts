@@ -27,6 +27,7 @@ export const TEST_RESTORE_RESULT_EVENT = {
       TEST_RESTORE_NO_BACKUPS: "test_restore_no_backups",
       TEST_RESTORE_DOWNLOAD_FAILED: "test_restore_download_failed",
       TEST_RESTORE_ABORTED_SAME_AS_BACKUP: "test_restore_aborted_same_as_backup",
+      TEST_RESTORE_ABORTED_HOST_NOT_ALLOWED: "test_restore_aborted_host_not_allowed",
     }
   }
 }
