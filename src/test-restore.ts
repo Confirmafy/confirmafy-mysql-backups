@@ -1,7 +1,8 @@
-import { createWriteStream, openSync, closeSync } from "fs";
-import { unlink } from "fs/promises";
+import { createWriteStream, openSync, closeSync, readdirSync } from "fs";
+import { unlink, rm } from "fs/promises";
 import { pipeline } from "stream/promises";
 import { spawnSync } from "child_process";
+import { join } from "path";
 import {
   S3Client,
   ListObjectsV2Command,
@@ -28,6 +29,26 @@ const {
   R2_BUCKET,
   R2_PATH = "mysql-backup",
 } = process.env;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * myloader --stream extracts data into import-* directories under the cwd
+ * and only attempts a simple rmdir() to clean up. If any files remain the
+ * directory is left behind. This function removes them with rm -rf.
+ */
+async function cleanupMyloaderImportDirs(baseDir: string): Promise<void> {
+  const entries = readdirSync(baseDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("import-")) {
+      const fullPath = join(baseDir, entry.name);
+      await rm(fullPath, { recursive: true, force: true });
+      console.log(`[test-restore] Cleaned up myloader directory: ${fullPath}`);
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -245,6 +266,9 @@ export async function runTestRestore(): Promise<void> {
   } finally {
     await unlink(localPath).catch((err) =>
       console.warn("[test-restore] Failed to remove temp file:", err),
+    );
+    await cleanupMyloaderImportDirs("/app").catch((err) =>
+      console.warn("[test-restore] Failed to clean up import dirs:", err),
     );
   }
 }

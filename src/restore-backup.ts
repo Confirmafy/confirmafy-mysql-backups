@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { createWriteStream, openSync, closeSync } from "fs";
-import { unlink } from "fs/promises";
+import { createWriteStream, openSync, closeSync, readdirSync } from "fs";
+import { unlink, rm } from "fs/promises";
 import { pipeline } from "stream/promises";
 import { spawnSync } from "child_process";
+import { join } from "path";
 import {
   S3Client,
   ListObjectsV2Command,
@@ -12,6 +13,21 @@ import {
 } from "@aws-sdk/client-s3";
 import type { Readable } from "stream";
 import inquirer from "inquirer";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function cleanupMyloaderImportDirs(baseDir: string): Promise<void> {
+  const entries = readdirSync(baseDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith("import-")) {
+      const fullPath = join(baseDir, entry.name);
+      await rm(fullPath, { recursive: true, force: true });
+      console.log(`Cleaned up myloader directory: ${fullPath}`);
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -245,8 +261,11 @@ async function main(): Promise<void> {
   });
   closeSync(fd);
 
-  // 6. Clean up temp file
+  // 6. Clean up temp file and leftover myloader import directories
   await unlink(localPath);
+  await cleanupMyloaderImportDirs("/app").catch((err) =>
+    console.warn("Failed to clean up import dirs:", err),
+  );
 
   if (result.status === 0) {
     console.log("\nRestore completed successfully.");
