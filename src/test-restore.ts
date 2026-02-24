@@ -12,8 +12,9 @@ import {
 import type { Readable } from "stream";
 import { TEST_RESTORE_RESULT_EVENT, logEvent } from "./otel.js";
 
-// Restores always go to this host. Myloader is called with this value.
 const RESTORE_TARGET_HOST = "mysql-fu1u.railway.internal";
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 30_000;
 
 const {
   MYSQL_HOST,
@@ -31,7 +32,35 @@ const {
 } = process.env;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Retry helper
+// ---------------------------------------------------------------------------
+
+async function withRetries<T>(
+  label: string,
+  maxAttempts: number,
+  fn: (attempt: number) => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      lastError = err;
+      console.error(`[test-restore] ${label} attempt ${attempt}/${maxAttempts} failed:`, err);
+
+      if (attempt < maxAttempts) {
+        console.log(`[test-restore] Retrying ${label} in ${RETRY_DELAY_MS / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup
 // ---------------------------------------------------------------------------
 
 /**
@@ -48,6 +77,12 @@ async function cleanupMyloaderImportDirs(baseDir: string): Promise<void> {
       console.log(`[test-restore] Cleaned up myloader directory: ${fullPath}`);
     }
   }
+}
+
+async function removeTempFile(path: string): Promise<void> {
+  await unlink(path).catch((err) =>
+    console.warn("[test-restore] Failed to remove temp file:", err),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +207,48 @@ async function downloadBackup(
 }
 
 // ---------------------------------------------------------------------------
+// Restore
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs myloader against the downloaded backup file.
+ * Returns the exit code (0 = success).
+ */
+function runMyloader(localPath: string): number | null {
+  const args = [
+    "--host",
+    RESTORE_TARGET_HOST,
+    "--port",
+    MYSQL_TO_RESTORE_PORT,
+    "--user",
+    MYSQL_TO_RESTORE_USER!,
+    "--password",
+    MYSQL_TO_RESTORE_PASSWORD!,
+    "--database",
+    MYSQL_TO_RESTORE_DATABASE!,
+    "--drop-table",
+    "--drop-database",
+    "--stream",
+    "--verbose",
+    "3",
+    "--protocol",
+    "tcp",
+    "--threads",
+    "0",
+  ];
+
+  const fd = openSync(localPath, "r");
+  try {
+    const result = spawnSync("myloader", args, {
+      stdio: [fd, "inherit", "inherit"],
+    });
+    return result.status;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -205,70 +282,50 @@ export async function runTestRestore(): Promise<void> {
   const backupName = key.replace(prefix, "");
   const localPath = `/tmp/${backupName}`;
 
+  // -- Download (with retries) --
+
   try {
-    console.log(`[test-restore] Downloading latest backup: ${backupName}`);
-    await downloadBackup(client, bucket, key, localPath);
-    console.log("[test-restore] Download complete.");
-  } catch (error) {
-    console.error("[test-restore] Download failed:", error);
+    await withRetries("download", MAX_ATTEMPTS, async (attempt) => {
+      console.log(`[test-restore] Downloading backup: ${backupName} (attempt ${attempt}/${MAX_ATTEMPTS})...`);
+      await downloadBackup(client, bucket, key, localPath);
+      console.log("[test-restore] Download complete.");
+    });
+  } catch {
     logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
       [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
         TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_DOWNLOAD_FAILED,
     });
-    throw error;
+    return;
   }
 
+  // -- Restore (with retries) --
+
   try {
-    const myloaderArgs = [
-      "--host",
-      RESTORE_TARGET_HOST,
-      "--port",
-      MYSQL_TO_RESTORE_PORT,
-      "--user",
-      MYSQL_TO_RESTORE_USER!,
-      "--password",
-      MYSQL_TO_RESTORE_PASSWORD!,
-      "--database",
-      MYSQL_TO_RESTORE_DATABASE!,
-      "--drop-table",
-      "--drop-database",
-      "--stream",
-      "--verbose",
-      "3",
-      "--protocol",
-      "tcp",
-      "--threads",
-      "0", // use all CPU cores
-    ];
+    await withRetries("restore", MAX_ATTEMPTS, async (attempt) => {
+      console.log(`[test-restore] Running myloader restore (attempt ${attempt}/${MAX_ATTEMPTS})...`);
+      const exitCode = runMyloader(localPath);
 
-    console.log("[test-restore] Running myloader restore...");
-    const fd = openSync(localPath, "r");
-    const result = spawnSync("myloader", myloaderArgs, {
-      stdio: [fd, "inherit", "inherit"],
+      await cleanupMyloaderImportDirs("/app").catch((err) =>
+        console.warn("[test-restore] Failed to clean up import dirs:", err),
+      );
+
+      if (exitCode !== 0) {
+        throw new Error(`myloader failed (exit code ${exitCode})`);
+      }
     });
-    closeSync(fd);
 
-    if (result.status === 0) {
-      console.log("[test-restore] Restore completed successfully.");
-      logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
-        [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
-          TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_SUCCESS,
-      });
-    } else {
-      console.error(`[test-restore] Restore failed (exit code ${result.status}).`);
-      logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
-        [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
-          TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_FAILED,
-        [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.ERROR_CODE]: result.status ?? -1,
-      });
-      throw new Error(`myloader failed (exit code ${result.status})`);
-    }
+    console.log("[test-restore] Restore completed successfully.");
+    logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
+      [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
+        TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_SUCCESS,
+    });
+  } catch {
+    console.error(`[test-restore] All ${MAX_ATTEMPTS} restore attempts failed.`);
+    logEvent(TEST_RESTORE_RESULT_EVENT.EVENT_NAME, {
+      [TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT]:
+        TEST_RESTORE_RESULT_EVENT.ATTRIBUTES.RESULT_VALUES.TEST_RESTORE_FAILED,
+    });
   } finally {
-    await unlink(localPath).catch((err) =>
-      console.warn("[test-restore] Failed to remove temp file:", err),
-    );
-    await cleanupMyloaderImportDirs("/app").catch((err) =>
-      console.warn("[test-restore] Failed to clean up import dirs:", err),
-    );
+    await removeTempFile(localPath);
   }
 }
