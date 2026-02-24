@@ -4,8 +4,12 @@ FROM mydumper/mydumper:v0.21.2-2
 
 # Install Node.js 22.x (LTS) and procps-ng (pgrep, pkill) — AlmaLinux 9 (RHEL-based)
 # Also install tmux so we can run restore jobs in the background and detach/reattach.
+ENV TINI_VERSION=v0.19.0
+RUN curl -fsSL "https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini" -o /usr/local/bin/tini \
+    && chmod +x /usr/local/bin/tini
+
 RUN dnf module enable -y nodejs:22 \
-    && dnf install -y nodejs npm procps-ng tmux tini \
+    && dnf install -y nodejs npm procps-ng tmux \
     && dnf clean all
 
 WORKDIR /app
